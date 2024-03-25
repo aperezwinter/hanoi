@@ -1,0 +1,557 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{graphicx,float,vmargin}
+\usepackage{amsmath,amssymb,mathtools}
+
+\newcommand{\Token}[2][]{\node(#2#1)[token]{#2};}
+\newcommand{\Symbol}[2][]{\node(#2#1)[symbol]{#2};}
+\newcommand{\Point}[1]{\node(#1)[point]{#1};}
+
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes,chains,fit}
+\usetikzlibrary{shapes.symbols}
+\usetikzlibrary{matrix}
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{shapes.geometric}
+
+\usepackage{pgfkeys}
+\usepackage{multicol}
+\pgfkeys %
+    {%
+      /tikz/coin/.style={
+        rectangle,
+        minimum height=2.5mm,
+        minimum width=1cm,
+        draw=black,
+        fill=black!20,
+        rounded corners
+      },
+      /tikz/towercolor/.style={
+        fill=black!90
+      },
+      /tikz/towerbase/.style={
+        trapezium,
+        trapezium angle=45,
+        trapezium stretches=true,
+        towercolor,
+        minimum width=7.5mm,
+        minimum height=2.5mm,
+      },
+      /tikz/tower/.style={
+        rectangle,
+        rounded corners,
+        towercolor,
+        minimum width=2.5mm,
+        minimum height=17.5mm,
+      }
+    }
+
+\title{ UBA - Carrera de Especialización en Inteligencia Artificial\\ 
+        Introducción a la Inteligencia Artificial - TP1\\
+        \textit{Algoritmos de búsqueda en Torre de Hanoi}}
+\author{Mgter. Ing. Alan Erik Perez Winter}
+\date{24 de Marzo de 2024}
+
+\begin{document}
+
+\maketitle
+
+\section{Consigna}
+\begin{enumerate}
+    \item ¿Cuáles son los PEAS de este problema? (Performance, Environment, Actuators, Sensors)
+    \item ¿Cuáles son las propiedades del entorno de trabajo?
+    \item En el contexto de este problema, establezca cuáles son los: estado, espacio de estados, árbol de búsqueda, nodo de búsqueda, objetivo, acción y frontera.
+    \item Implemente algún método de búsqueda. Puedes elegir cualquiera menos búsqueda en anchura primero (el desarrollado en clase). Sos libre de elegir cualquiera de los vistos en clases, o inclusive buscar nuevos.
+    \item ¿Qué complejidad en tiempo y memoria tiene el algoritmo elegido?
+    \item A nivel implementación, ¿qué tiempo y memoria ocupa el algoritmo? (Se recomienda correr 10 veces y calcular promedio y desvío estándar de las métricas).
+    \item Si la solución óptima es $2^k - 1$ movimientos con *k* igual al número de discos. Qué tan lejos está la solución del algoritmo implementado de esta solución óptima (se recomienda correr al menos 10 veces y usar el promedio de trayecto usado). 
+\end{enumerate}
+
+\section{Resolución}
+
+\subsection{\textit{PEAS}}
+\begin{itemize}
+    \item \textbf{Performance}: Es medida por la eficiencia de resolver el problema de las Torres de Hanoi, típicamente cuantificado por el número de movimientos o el tiempo que lleva resolver el algoritmo. El objetivo es el de mover todos los discos desde un poste inicial al poste objetivo, mientras se siguen las reglas del juego.
+    \item \textbf{Eviroment}: En este problema, consiste en el número de postes y discos; e.g. 4 discos y tres postes. Sobre los postes se posicionan los discos de diferentes tamaños, agrupados en orden ascendente desde la parte superior hasta la inferior. Las reglas del entorno (\textit{enviroment)} son dos: La primera dice que solo se puede mover de a un disco a la vez. La segunda dice que un disco solo puede ser colocado encima de otro más grande o un poste vacía.
+    \item \textbf{Actuators}: Son los medios por los que el agente interactúa con el entorno para alcanzar los objetivos. En este problema, los actuadores son las acciones que el agente puede ejecutar para mover discos entre postes. Por otro lado, la única acción que puede realizar el agente es la de mover un disco de un poste a otra, siguiendo con las reglas del juego establecidas.
+    \item \textbf{Sensors}: Proveen al agente de información acerca del estado del entorno. En este problema, los sensores proveen información acerca de la configuración actual de los discos en los postes. El agente necesita saber tres cosas. En primer lugar, la disposición actual de los discos en los postes. En segundo lugar, cuales discos son más grandes o chicos que otros. En tercer lugar, cuales postes tienen espacio disponible para recibir discos.
+\end{itemize}
+
+\subsection{Propiedades del entorno}
+El problema de la Torre de Hanoi tiene varias propiedades de entorno que afectan como un agente interactúa con ellas. La comprensión de estas propiedades ayudan a diseñar apropiadamente algoritmos y heurísticas para resolver, el problema en cuestión, de manera eficiente usando técnicas de inteligencia artificial. Dichas propiedades se describen a continuación:
+\begin{itemize}
+    \item \textbf{Discreta}: El problema de la Torre de Hanoi es representado en un entorno discreto. Cada acción (mover un disco de un poste a otra) resulta en un cambio completo de estado.
+    \item \textbf{Observable}: El entorno es totalmente observable. El agente puede fácilmente percibir el estado actual del problema, a partir de una simple observación de la configuración de los discos en los postes.
+    \item \textbf{Determinista}: Los resultados de la Torre de Hanoi son deterministas. Es decir, dado un particular estado y acción, el resultado es predecible y no involucra aleatoriedad.
+    \item \textbf{Estático}: El entorno de Torre de Hanoi es estático, es decir, no cambia al menos que se lleve a cabo una acción por parte del agente. Los postes y los discos permanecen en las mismas posiciones al menos que el agente los mueva.
+    \item \textbf{Secuencialidad}: El problema Torre de Hanoi involucra una secuencia de acciones, es decir, cada acción se construye en base a las anteriores, conllevando a la solución final.
+    \item \textbf{Conocimiento}: El problema de Torre de Hanoi se encuentra bien definido y se conoce por completo, es decir, el agente tiene la información completa acerca de las reglas del juego y del estado actual del entorno.
+\end{itemize}
+
+\subsection{\textit{Estado, Espacio de estados, árbol de búsqueda, nodo de búsqueda, objetivo, acción y frontera}}
+\begin{itemize}
+    \item \textbf{Estado}: Un estado en el problema de la Torre de Hanoi describe la disposición actual de los discos en los tres postes. Cada estado se caracteriza por la ubicación de los discos en cada poste y su tamaño relativo. Por ejemplo, sea el Problema de Torre de Hanoi con 4 discos y 3 postes, donde discos con mayor índice corresponde a los de mayor tamaño, un posible estado sería: $[[4,3,2,1],[ ],[ ]]$, donde cada lista interna representa un poste y, el orden de los números corresponde a el orden de los discos desde la parte inferior a la superior en el poste (ver Figura \ref{fig:example_state}). Si la lista interna se encuentra vacía eso implica que el poste no tiene discos.
+
+    \begin{figure}
+        \centering
+        \begin{tikzpicture}
+            \pgfdeclarelayer{background}
+            \pgfsetlayers{background,main}
+            \node[towerbase] (baseA) at (0,0){};
+            \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+            \node[towerbase] (baseC) at (3cm,0){};
+            \node[tower,above] (towerA) at (baseA.south){};
+            \node[tower,above] (towerB) at (baseB.south){};
+            \node[tower,above] (towerC) at (baseC.south){};
+            \node[above] at (towerA.north) {$A$}; 
+            \node[above] at (towerB.north) {$B$}; 
+            \node[above] at (towerC.north) {$C$}; 
+            
+            \begin{scope}[every node/.style={coin,above}]
+            \node[minimum width=1.75cm] (d) at (baseA.north){};
+            \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+            \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+            \node[coin,minimum width=1cm] (a) at (b.north) {};
+            \end{scope}
+            \node[above] at (towerA.north) {$A$}; 
+            \begin{pgfonlayer}{background}
+            \node[rectangle, fill=yellow!40, fit=(towerA) (baseB) (baseC) (d)] {};
+            \end{pgfonlayer}
+        \end{tikzpicture}
+        \caption{Ejemplo de Estado de Torre de Hanoi $[[4,3,2,1],[ ],[ ]]$}
+        \label{fig:example_state}
+    \end{figure}
+    
+    \item \textbf{Espacio de estados}: El espacio de estados es el conjunto de todos los posibles estados que pueden surgir durante la resolución del problema. En el caso de la Torre de Hanoi, el espacio de estados consiste en todas las posibles configuraciones de discos en los tres postes, obedeciendo las restricciones del problema. En base al ejemplo planteado en el ítem anterior, los siguientes son algunos de los posibles estados del espacio de estados: $[[4,3,2],[1],[ ]]$, $[[4,3],[ ],[2,1]]$, $[[3],[4],[2,1]]$ (ver Figura \ref{fig:example_states}).
+
+    \begin{figure}
+        \centering
+        \begin{multicols}{3}
+            \begin{tikzpicture}
+                \pgfdeclarelayer{background}
+                \pgfsetlayers{background,main}
+                \node[towerbase] (baseA) at (0,0){};
+                \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                \node[towerbase] (baseC) at (3cm,0){};
+                \node[tower,above] (towerA) at (baseA.south){};
+                \node[tower,above] (towerB) at (baseB.south){};
+                \node[tower,above] (towerC) at (baseC.south){};
+                \node[above] at (towerA.north) {$A$}; 
+                \node[above] at (towerB.north) {$B$}; 
+                \node[above] at (towerC.north) {$C$}; 
+                
+                \begin{scope}[every node/.style={coin,above}]
+                \node[minimum width=1.75cm] (d) at (baseA.north){};
+                \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                \node[coin,minimum width=1cm] (a) at (baseB.north) {};
+                \end{scope}
+                \node[above] at (towerA.north) {$A$}; 
+                \begin{pgfonlayer}{background}
+                \node[rectangle, fill=yellow!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                \end{pgfonlayer}
+            \end{tikzpicture}
+            \newpage
+            \begin{tikzpicture}
+                \pgfdeclarelayer{background}
+                \pgfsetlayers{background,main}
+                \node[towerbase] (baseA) at (0,0){};
+                \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                \node[towerbase] (baseC) at (3cm,0){};
+                \node[tower,above] (towerA) at (baseA.south){};
+                \node[tower,above] (towerB) at (baseB.south){};
+                \node[tower,above] (towerC) at (baseC.south){};
+                \node[above] at (towerA.north) {$A$}; 
+                \node[above] at (towerB.north) {$B$}; 
+                \node[above] at (towerC.north) {$C$}; 
+                
+                \begin{scope}[every node/.style={coin,above}]
+                \node[minimum width=1.75cm] (d) at (baseA.north){};
+                \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                \node[coin,minimum width=1.25cm] (b) at (baseC.north) {};
+                \node[coin,minimum width=1cm] (a) at (b.north) {};
+                \end{scope}
+                \node[above] at (towerA.north) {$A$}; 
+                \begin{pgfonlayer}{background}
+                \node[rectangle, fill=yellow!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                \end{pgfonlayer}
+            \end{tikzpicture}
+            \newpage
+            \begin{tikzpicture}
+                \pgfdeclarelayer{background}
+                \pgfsetlayers{background,main}
+                \node[towerbase] (baseA) at (0,0){};
+                \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                \node[towerbase] (baseC) at (3cm,0){};
+                \node[tower,above] (towerA) at (baseA.south){};
+                \node[tower,above] (towerB) at (baseB.south){};
+                \node[tower,above] (towerC) at (baseC.south){};
+                \node[above] at (towerA.north) {$A$}; 
+                \node[above] at (towerB.north) {$B$}; 
+                \node[above] at (towerC.north) {$C$}; 
+                
+                \begin{scope}[every node/.style={coin,above}]
+                \node[minimum width=1.75cm] (d) at (baseB.north){};
+                \node[coin,minimum width=1.5cm, above] (c) at (baseA.north) {};
+                \node[coin,minimum width=1.25cm] (b) at (baseC.north) {};
+                \node[coin,minimum width=1cm] (a) at (b.north) {};
+                \end{scope}
+                \node[above] at (towerA.north) {$A$}; 
+                \begin{pgfonlayer}{background}
+                \node[rectangle, fill=yellow!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                \end{pgfonlayer}
+            \end{tikzpicture}
+        \end{multicols}
+        \caption{Ejemplos de Estados de Torre de Hanoi $[[4,3,2],[1],[ ]]$, $[[4,3],[ ],[2,1]]$, $[[3],[4],[2,1]]$}
+        \label{fig:example_states}
+    \end{figure}
+    
+    \item \textbf{Árbol de búsqueda}: El árbol de búsqueda es una estructura jerárquica que representa todas las posibles secuencias de acciones que el agente puede tomar para resolver el problema. Cada nodo en el árbol de búsqueda representa un estado, y las ramas que salen de cada nodo representan las acciones posibles desde ese estado. A modo de ejemplo, en la Figura \ref{fig:example_father_sons_1} se muestra el nodo raíz y sus dos nodos hijos. Luego en las Figuras \ref{fig:example_father_sons_2} y \ref{fig:example_father_sons_3} se muestran los nodos hijos de cada uno de los nodos hijos del nodo raíz, respectivamente.
+
+    \begin{figure}
+        \centering
+            \begin{tikzpicture}
+                \pgfdeclarelayer{background}
+                \pgfsetlayers{background,main}
+                \node[towerbase] (baseA) at (0,0){};
+                \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                \node[towerbase] (baseC) at (3cm,0){};
+                \node[tower,above] (towerA) at (baseA.south){};
+                \node[tower,above] (towerB) at (baseB.south){};
+                \node[tower,above] (towerC) at (baseC.south){};
+                \node[above] at (towerA.north) {$A$}; 
+                \node[above] at (towerB.north) {$B$}; 
+                \node[above] at (towerC.north) {$C$}; 
+                
+                \begin{scope}[every node/.style={coin,above}]
+                \node[minimum width=1.75cm] (d) at (baseA.north){};
+                \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                \node[coin,minimum width=1cm] (a) at (b.north) {};
+                \end{scope}
+                \node[above] at (towerA.north) {$A$}; 
+                \begin{pgfonlayer}{background}
+                \node[rectangle, fill=yellow!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                \end{pgfonlayer}
+            \end{tikzpicture}
+            \newpage
+            \begin{multicols}{2}
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                    \node[coin,minimum width=1cm] (a) at (baseB.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=blue!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+                \newpage  
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                    \node[coin,minimum width=1cm] (a) at (baseC.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=blue!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+            \end{multicols}
+        \caption{Ejemplo de Arbol de Estados. Estado Padre $[[4,3,2,1],[],[]]$. Estados Hijos $[[4,3,2],[1],[]]$, $[[4,3,2],[],[1]]$}
+        \label{fig:example_father_sons_1}
+    \end{figure}
+    
+    
+    \begin{figure}
+        \centering
+            \begin{tikzpicture}
+                \pgfdeclarelayer{background}
+                \pgfsetlayers{background,main}
+                \node[towerbase] (baseA) at (0,0){};
+                \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                \node[towerbase] (baseC) at (3cm,0){};
+                \node[tower,above] (towerA) at (baseA.south){};
+                \node[tower,above] (towerB) at (baseB.south){};
+                \node[tower,above] (towerC) at (baseC.south){};
+                \node[above] at (towerA.north) {$A$}; 
+                \node[above] at (towerB.north) {$B$}; 
+                \node[above] at (towerC.north) {$C$}; 
+                
+                \begin{scope}[every node/.style={coin,above}]
+                \node[minimum width=1.75cm] (d) at (baseA.north){};
+                \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                \node[coin,minimum width=1cm] (a) at (baseB.north) {};
+                \end{scope}
+                \node[above] at (towerA.north) {$A$}; 
+                \begin{pgfonlayer}{background}
+                \node[rectangle, fill=blue!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                \end{pgfonlayer}
+            \end{tikzpicture}
+            \newpage
+            \begin{multicols}{3}
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                    \node[coin,minimum width=1cm] (a) at (baseC.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=red!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+                \newpage  
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (baseC.north) {};
+                    \node[coin,minimum width=1cm] (a) at (baseB.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=red!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+                \newpage
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                    \node[coin,minimum width=1cm] (a) at (b.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=red!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+            \end{multicols}
+        \caption{Ejemplo de Arbol de Estados. Estado Padre $[[4,3,2],[1],[]]$. Estados Hijos $[[4,3,2],[],[1]]$, $[[4,3],[1],[2]]$, $[[4,3,2,1],[],[]]$}
+        \label{fig:example_father_sons_2}
+    \end{figure}
+    
+    \begin{figure}
+        \centering
+            \begin{tikzpicture}
+                \pgfdeclarelayer{background}
+                \pgfsetlayers{background,main}
+                \node[towerbase] (baseA) at (0,0){};
+                \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                \node[towerbase] (baseC) at (3cm,0){};
+                \node[tower,above] (towerA) at (baseA.south){};
+                \node[tower,above] (towerB) at (baseB.south){};
+                \node[tower,above] (towerC) at (baseC.south){};
+                \node[above] at (towerA.north) {$A$}; 
+                \node[above] at (towerB.north) {$B$}; 
+                \node[above] at (towerC.north) {$C$}; 
+                
+                \begin{scope}[every node/.style={coin,above}]
+                \node[minimum width=1.75cm] (d) at (baseA.north){};
+                \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                \node[coin,minimum width=1cm] (a) at (baseC.north) {};
+                \end{scope}
+                \node[above] at (towerA.north) {$A$}; 
+                \begin{pgfonlayer}{background}
+                \node[rectangle, fill=blue!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                \end{pgfonlayer}
+            \end{tikzpicture}
+            \newpage
+            \begin{multicols}{3}
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                    \node[coin,minimum width=1cm] (a) at (baseB.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=red!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+                \newpage  
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (baseB.north) {};
+                    \node[coin,minimum width=1cm] (a) at (baseC.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=red!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+                \newpage
+                \begin{tikzpicture}
+                    \pgfdeclarelayer{background}
+                    \pgfsetlayers{background,main}
+                    \node[towerbase] (baseA) at (0,0){};
+                    \node[towerbase] (baseB) at (1.5cm,-1.5cm){};
+                    \node[towerbase] (baseC) at (3cm,0){};
+                    \node[tower,above] (towerA) at (baseA.south){};
+                    \node[tower,above] (towerB) at (baseB.south){};
+                    \node[tower,above] (towerC) at (baseC.south){};
+                    \node[above] at (towerA.north) {$A$}; 
+                    \node[above] at (towerB.north) {$B$}; 
+                    \node[above] at (towerC.north) {$C$}; 
+                    
+                    \begin{scope}[every node/.style={coin,above}]
+                    \node[minimum width=1.75cm] (d) at (baseA.north){};
+                    \node[coin,minimum width=1.5cm, above] (c) at (d.north) {};
+                    \node[coin,minimum width=1.25cm] (b) at (c.north) {};
+                    \node[coin,minimum width=1cm] (a) at (b.north) {};
+                    \end{scope}
+                    \node[above] at (towerA.north) {$A$}; 
+                    \begin{pgfonlayer}{background}
+                    \node[rectangle, fill=red!40, fit=(towerA) (baseB) (baseC) (d)] {};
+                    \end{pgfonlayer}
+                \end{tikzpicture}
+            \end{multicols}
+        \caption{Ejemplo de Arbol de Estados. Estado Padre $[[4,3,2],[],[1]]$. Estados Hijos $[[4,3,2],[1],[]]$, $[[4,3],[2],[1]]$, $[[4,3,2,1],[],[]]$}
+        \label{fig:example_father_sons_3}
+    \end{figure}
+
+    \item \textbf{Nodo de búsqueda}: Un nodo de búsqueda es un elemento en el árbol de búsqueda que contiene información sobre un estado específico del problema. Cada nodo puede tener uno o más nodos hijos que representan los posibles estados que pueden alcanzarse desde ese estado mediante una acción.
+    \item \textbf{Objetivo}: El objetivo del problema de la Torre de Hanoi es mover todos los discos desde el poste de inicio hasta el poste objetivo, siguiendo las reglas del juego. El objetivo se alcanza cuando todos los discos se han movido al poste objetivo en la misma disposición ordenada.
+    \item \textbf{Acción}: Una acción en el problema de la Torre de Hanoi implica mover un disco de un poste a otro, siguiendo las reglas del juego. Solo se puede mover un disco a la vez y un disco no puede colocarse sobre uno más pequeño.
+    \item \textbf{Frontera}: La frontera es el conjunto de nodos de búsqueda que aún no se han explorado pero que están disponibles para ser explorados. En un algoritmo de búsqueda, la frontera representa los posibles estados que el agente puede alcanzar desde el estado actual, pero que aún no se han explorado completamente. En la práctica, esto se implementa como una estructura de datos, como una cola o una pila, que contiene los nodos de búsqueda que deben expandirse en la siguiente iteración del algoritmo de búsqueda.
+\end{itemize}
+
+
+\subsection{\textit{Complejidad en tiempo y memoria}}
+
+\subsubsection{Búsqueda en Amplitud (BFS)}
+\begin{itemize}
+    \item Complejidad en tiempo: En el peor caso, la complejidad en tiempo de BFS es $\mathcal{O}(b^d)$, donde $b$ es el factor de ramificación promedio y $d$ es la profundidad máxima del árbol de búsqueda. En la Torre de Hanoi, la profundidad máxima es $2^n-1$, donde $n$ es el número de discos.
+    \item Complejidad en memoria: BFS requiere $\mathcal{O}(b^d)$ memoria en el peor caso para almacenar todos los nodos en un nivel dado del árbol de búsqueda.
+\end{itemize}
+
+\subsubsection{Búsqueda en Amplitud (DFS)}
+\begin{itemize}
+    \item Complejidad en tiempo: En el peor caso, la complejidad en tiempo de DFS es $\mathcal{O}(b^d)$, donde $b$ es el factor de ramificación promedio y $d$ es la profundidad máxima del árbol de búsqueda. En el caso de la Torre de Hanoi, la profundidad máxima puede ser $2^n-1$, donde $n$ es el número de discos.
+    \item Complejidad en memoria: DFS puede requerir $\mathcal{O}(b\cdot d)$ memoria en el peor caso para almacenar la ruta desde la raíz hasta el nodo actual.
+\end{itemize}
+
+\subsection{Resultados}
+Los resultados presentados en esta sección se basan en resolver el problema de Torre de Hanoi con 3 postes y 4 discos, donde el estado inicial es $[[4,3,2,1],[],[]]$ y el estado final es $[[],[],[4,3,2,1]]$. Se desea en primer lugar conocer el tiempo y memoria que ocupa el algoritmo, para ello se ejecutó el mismo unas 10 veces y se calculó su promedio y desvío estándar. Se resolvió con los algoritmos BFS y DFS y se obtuvieron los siguientes resultados:
+\begin{itemize}
+    \item \textbf{BFS}: Tiempo$=126.8\pm 6.4\,\mathrm{ms}$. Memoria$=2.2\pm 0.2\,\mathrm{MB}$.
+    \item \textbf{DFS}: Tiempo$=118.4\pm 1.7\,\mathrm{ms}$. Memoria$=2.3\pm 0.7\,\mathrm{MB}$.
+\end{itemize}
+Luego, se resolvió el problema de Torre de Hanoi pero para distintos casos y se calculó la cantidad de pasos hasta encontrar la solución. Los casos varían según el número de discos, en donde se comienza desde dos discos hasta finalizar con seis discos. Se sabe que la solución óptima implica una cantidad de pasos, los cuales vienen dados por la fórmula $2^k-1$ con $k$ el número de discos. En el Cuadro~\ref{tab:results} se muestran los resultados obtenidos de los pasos necesarios para resolver el problema, según los dos tipos algoritmos implementados.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{|c|c|c|c|}
+        \hline
+        \textbf{Discos} & \textbf{Pasos teóricos} & \textbf{BFS} & \textbf{DFS} \\ \hline
+        2 & 3 & 9 & 5 \\ \hline
+        3 & 7 & 27 & 23 \\ \hline
+        4 & 15 & 81 & 31 \\ \hline
+        5 & 31 & 243 & 193 \\ \hline
+        6 & 63 & 729 & 225 \\ \hline
+    \end{tabular}
+    \caption{Pasos obtenidos según los algoritmos BFS y DFS, para el problema de Hanoi con cuatro discos y tres postes.}
+    \label{tab:results}
+\end{table}
+
+
+
+
+\end{document}
